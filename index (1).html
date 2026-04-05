@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malik Ashiq Business Suite - Auto-Khata & Lock Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f3f4f6; 
+            color: #1f2937;
+            font-size: 13px;
+        }
+
+        .excel-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        .excel-table th {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 10px;
+            text-align: left;
+            color: #475569;
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .excel-table td {
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+        }
+        .excel-table tr:hover { background-color: #f0f7ff; }
+
+        .tab-active { 
+            background-color: #ffffff; 
+            border-bottom: 3px solid #1d4ed8;
+            color: #1d4ed8 !important;
+        }
+
+        .input-excel {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .input-excel:focus { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.1); }
+
+        .btn-primary { background: #1d4ed8; color: white; font-weight: 700; border-radius: 4px; padding: 8px 16px; transition: opacity 0.2s; cursor: pointer; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-success { background: #059669; color: white; font-weight: 700; border-radius: 4px; padding: 8px 16px; cursor: pointer; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printContainer, #printContainer * { visibility: visible; }
+            #printContainer { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%;
+                background: white;
+            }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Login Overlay (First Time Only) -->
+    <div id="loginOverlay" class="fixed inset-0 bg-slate-900 flex items-center justify-center z-[100]">
+        <div class="bg-white p-8 rounded shadow-2xl w-80 text-center">
+            <h1 class="text-xl font-bold mb-4 text-blue-800 uppercase tracking-widest">Malik Ashiq Store</h1>
+            <p class="text-[10px] mb-4 text-slate-400">APNA SYSTEM PIN DAALEN</p>
+            <input type="password" id="sysPassInput" class="input-excel text-center mb-4" placeholder="PIN ENTER KAREIN">
+            <button onclick="checkLogin()" class="w-full btn-primary">LOGIN</button>
+        </div>
+    </div>
+
+    <div id="mainApp" class="hidden">
+        <header class="bg-blue-900 text-white p-3 no-print flex justify-between items-center px-6 shadow-md">
+            <span class="font-bold tracking-tighter text-lg" id="headerBrand">MALIK ASHIQ BUSINESS PRO</span>
+            <div id="currentTime" class="text-xs opacity-80 font-mono"></div>
+        </header>
+
+        <nav class="flex bg-slate-100 border-b no-print sticky top-0 z-10 overflow-x-auto shadow-sm">
+            <button onclick="switchTab('billing')" id="tab-billing" class="px-6 py-4 font-bold text-slate-500 tab-active border-r border-slate-200">Billing (Sales)</button>
+            <button onclick="switchTab('khata')" id="tab-khata" class="px-6 py-4 font-bold text-slate-500 border-r border-slate-200">Khata (Udhaar)</button>
+            <button onclick="switchTab('reports')" id="tab-reports" class="px-6 py-4 font-bold text-slate-500 border-r border-slate-200">Reports (Nafa)</button>
+            <button onclick="switchTab('inventory')" id="tab-inventory" class="px-6 py-4 font-bold text-slate-500 border-r border-slate-200">Stock Manager</button>
+            <!-- Ab Settings ke liye bhi secureAction call hoga -->
+            <button onclick="secureAction(() => switchTab('settings'), 'settings')" id="tab-settings" class="px-6 py-4 font-bold text-slate-500">Settings</button>
+        </nav>
+
+        <main class="p-6 no-print">
+            
+            <!-- BILLING SECTION -->
+            <section id="sec-billing">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-8 space-y-4">
+                        <div class="bg-white p-4 border rounded flex gap-3 items-end shadow-sm">
+                            <div class="flex-1 relative">
+                                <label class="text-[10px] font-bold block mb-1">ITEM SEARCH</label>
+                                <input type="text" id="billItemSearch" oninput="autoFillPrice()" class="input-excel" placeholder="Item ka naam likhen...">
+                                <div id="searchHint" class="absolute bg-white border shadow-xl w-full hidden z-50 mt-1 max-h-60 overflow-y-auto"></div>
+                            </div>
+                            <div class="w-24">
+                                <label class="text-[10px] font-bold block mb-1">PRICE</label>
+                                <input type="number" id="billRate" class="input-excel" placeholder="0">
+                            </div>
+                            <div class="w-20">
+                                <label class="text-[10px] font-bold block mb-1">QTY</label>
+                                <input type="number" id="billQty" class="input-excel" value="1">
+                            </div>
+                            <button onclick="addToBill()" class="btn-primary h-[38px] px-8">ADD</button>
+                        </div>
+                        <div class="bg-white border rounded overflow-hidden min-h-[400px] shadow-sm">
+                            <table class="excel-table">
+                                <thead>
+                                    <tr>
+                                        <th>Description</th>
+                                        <th class="w-20 text-center">Qty</th>
+                                        <th class="w-28 text-right">Rate</th>
+                                        <th class="w-28 text-right">Total</th>
+                                        <th class="w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="billBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-4">
+                        <div class="bg-white p-6 border rounded shadow-md space-y-4 sticky top-24">
+                            <div class="flex justify-between items-center border-b pb-3">
+                                <span class="font-bold text-slate-500">Total Bill</span>
+                                <span class="text-3xl font-black text-blue-700" id="billTotalDisplay">Rs 0</span>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold block mb-1 uppercase">Customer Name</label>
+                                <input type="text" id="billCustomerName" class="input-excel font-bold" placeholder="Walk-in Customer" list="customerList">
+                                <datalist id="customerList"></datalist>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="text-[10px] font-bold block mb-1 uppercase">Cash Paid (Wasil)</label>
+                                    <input type="number" id="paidAmount" oninput="calculateBalance()" class="input-excel text-green-700 font-bold" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold block mb-1 uppercase">Balance (Baqi)</label>
+                                    <div id="remainingAmount" class="p-2 border rounded bg-slate-50 text-slate-700 font-bold">0</div>
+                                </div>
+                            </div>
+                            <button onclick="finalizeBill()" class="w-full bg-slate-900 text-white py-4 rounded font-bold text-lg hover:bg-black transition-all uppercase tracking-widest shadow-lg">Print & Save</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- KHATA SECTION -->
+            <section id="sec-khata" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-5 border rounded shadow-sm">
+                        <h2 class="font-bold mb-4 text-blue-700 border-b pb-2 uppercase text-xs">New Khata Entry</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-[10px] font-bold block mb-1">CUSTOMER NAME</label>
+                                <input type="text" id="khataCustomerName" class="input-excel font-bold" list="customerList">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold block mb-1">ENTRY TYPE</label>
+                                <select id="khataType" class="input-excel">
+                                    <option value="debit">Gave (Udhaar Diya +)</option>
+                                    <option value="credit">Received (Wapis Mila -)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold block mb-1">AMOUNT</label>
+                                <input type="number" id="khataAmount" class="input-excel font-black">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold block mb-1">REASON / NOTE</label>
+                                <input type="text" id="khataNote" class="input-excel" placeholder="Details...">
+                            </div>
+                            <button onclick="saveKhataEntry()" class="w-full btn-primary py-3 uppercase text-xs">Add to Khata</button>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-3 bg-white border rounded shadow-sm overflow-hidden">
+                        <div class="p-3 bg-slate-50 border-b flex justify-between items-center">
+                            <span class="font-bold text-xs uppercase text-slate-500">Khata History</span>
+                            <input type="text" id="khataSearch" oninput="renderKhataList()" class="text-xs p-1.5 border rounded w-48" placeholder="Search Customer...">
+                        </div>
+                        <table class="excel-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Customer</th>
+                                    <th>Reason</th>
+                                    <th class="text-right">Debit (+)</th>
+                                    <th class="text-right">Credit (-)</th>
+                                    <th class="w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="khataTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- REPORTS SECTION -->
+            <section id="sec-reports" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-600 text-white p-5 rounded shadow-lg">
+                        <div class="text-[10px] uppercase font-bold opacity-80">Today's Sales</div>
+                        <div class="text-2xl font-black" id="repTodaySale">Rs 0</div>
+                    </div>
+                    <div class="bg-emerald-600 text-white p-5 rounded shadow-lg">
+                        <div class="text-[10px] uppercase font-bold opacity-80">Cash Hand</div>
+                        <div class="text-2xl font-black" id="repTodayCash">Rs 0</div>
+                    </div>
+                    <div class="bg-orange-600 text-white p-5 rounded shadow-lg">
+                        <div class="text-[10px] uppercase font-bold opacity-80">Total Udhaar</div>
+                        <div class="text-2xl font-black" id="repTodayUdhaar">Rs 0</div>
+                    </div>
+                    <div class="bg-slate-800 text-white p-5 rounded shadow-lg">
+                        <div class="text-[10px] uppercase font-bold opacity-80">Net Profit</div>
+                        <div class="text-2xl font-black" id="repTodayProfit">Rs 0</div>
+                    </div>
+                </div>
+                <div class="bg-white border rounded shadow-sm overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b flex justify-between items-center">
+                        <span class="font-bold text-xs uppercase text-slate-500">Ledger Summary</span>
+                        <button onclick="downloadCSV()" class="bg-slate-700 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-black transition-all shadow-sm">Export to Excel (.csv)</button>
+                    </div>
+                    <table class="excel-table" id="reportTable">
+                        <thead>
+                            <tr>
+                                <th>Customer Name</th>
+                                <th class="text-right">Total Bill</th>
+                                <th class="text-right">Cash Paid</th>
+                                <th class="text-right">Baqi (Balance)</th>
+                                <th class="text-right">Estimated Nafa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledgerBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- INVENTORY SECTION -->
+            <section id="sec-inventory" class="hidden">
+                <div class="bg-white border rounded shadow-sm overflow-hidden">
+                    <div class="p-4 flex justify-between items-center bg-slate-50 border-b">
+                        <h2 class="font-bold uppercase text-xs">Stock Inventory (Protected)</h2>
+                        <button onclick="secureAction(openProductModal, 'stock')" class="btn-success text-xs shadow-md">+ Add New Stock</button>
+                    </div>
+                    <table class="excel-table">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th class="text-right">Kharid Price (Cost)</th>
+                                <th class="text-right">Sale Price (Rate)</th>
+                                <th class="text-center">Stock Available</th>
+                                <th class="w-32 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTable"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- SETTINGS -->
+            <section id="sec-settings" class="hidden">
+                <div class="max-w-md mx-auto bg-white border rounded shadow-sm p-6">
+                    <h2 class="font-bold mb-4 border-b pb-2 uppercase text-xs">Configuration</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-bold block mb-1">SHOP NAME</label>
+                            <input type="text" id="setShopName" oninput="saveSettings()" class="input-excel font-bold">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold block mb-1">BILLING PIN</label>
+                                <input type="text" id="setPin" oninput="saveSettings()" class="input-excel" placeholder="Default: 545">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold block mb-1">STOCK/SETTINGS PIN</label>
+                                <input type="text" id="setStockPin" oninput="saveSettings()" class="input-excel" placeholder="Default: 545">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold block mb-1">PRINTER SETUP</label>
+                            <select id="setPrintType" onchange="saveSettings()" class="input-excel">
+                                <option value="thermal">Thermal (80mm)</option>
+                                <option value="standard">Standard A4</option>
+                            </select>
+                        </div>
+                        <div class="pt-6 border-t mt-4">
+                            <p class="text-[10px] text-slate-400 mb-4 uppercase font-bold text-center">V 2.6 - DATA SECURED</p>
+                            <button onclick="if(confirm('Warning: Saara data delete ho jayega. Continue?')){localStorage.clear(); location.reload();}" class="w-full border border-red-200 text-red-500 py-2 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors">Clear Entire Database</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- PRINT TEMPLATE -->
+    <div id="printContainer" class="hidden p-4"></div>
+
+    <script>
+        const DB_KEY = 'malik_pro_db_v26';
+        
+        let state = {
+            pin: "123", 
+            billPin: "545", 
+            stockPin: "545",
+            shop: "MALIK ASHIQ STORE",
+            print: 'thermal',
+            inventory: [], 
+            sales: [],     
+            khata: [],
+            bill: []
+        };
+
+        function init() {
+            const saved = localStorage.getItem(DB_KEY);
+            if (saved) {
+                state = { ...state, ...JSON.parse(saved) };
+            }
+            
+            document.getElementById('setShopName').value = state.shop;
+            document.getElementById('setPin').value = state.billPin;
+            document.getElementById('setStockPin').value = state.stockPin;
+            document.getElementById('setPrintType').value = state.print;
+            
+            setInterval(() => {
+                document.getElementById('currentTime').innerText = new Date().toLocaleString();
+            }, 1000);
+
+            updateCustomerDatalist();
+            updateUI();
+        }
+
+        function save() { 
+            localStorage.setItem(DB_KEY, JSON.stringify(state)); 
+        }
+
+        function checkLogin() {
+            if (document.getElementById('sysPassInput').value === state.pin) {
+                document.getElementById('loginOverlay').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+            } else {
+                alert("Ghalat PIN!");
+            }
+        }
+
+        function secureAction(callback, mode = 'billing') {
+            const targetPin = (mode === 'billing') ? state.billPin : state.stockPin;
+            const upin = prompt(`Enter PIN to access ${mode.toUpperCase()}:`);
+            if (upin === targetPin) {
+                callback();
+            } else {
+                alert("Incorrect PIN!");
+            }
+        }
+
+        function switchTab(t) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('sec-' + t).classList.remove('hidden');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById('tab-' + t).classList.add('tab-active');
+            
+            if(t === 'khata') renderKhataList();
+            if(t === 'reports') renderReports();
+            if(t === 'inventory') renderInventory();
+        }
+
+        // --- INVENTORY ---
+        function renderInventory() {
+            const b = document.getElementById('inventoryTable'); b.innerHTML = '';
+            state.inventory.sort((x, y) => x.name.localeCompare(y.name)).forEach((i, idx) => {
+                const stockColor = i.stock <= 5 ? 'text-red-600 font-black' : 'text-slate-800';
+                b.innerHTML += `
+                    <tr>
+                        <td class="font-bold text-slate-700">${i.name}</td>
+                        <td class="text-right text-slate-500">Rs ${i.cost.toLocaleString()}</td>
+                        <td class="text-right font-bold text-blue-700">Rs ${i.sale.toLocaleString()}</td>
+                        <td class="text-center"><span class="px-3 py-1 rounded-full bg-slate-100 ${stockColor}">${i.stock}</span></td>
+                        <td class="text-center">
+                            <button onclick="secureAction(() => editStock(${idx}), 'stock')" class="text-blue-600 mr-4 text-[10px] font-bold uppercase">Edit</button>
+                            <button onclick="secureAction(() => deleteStock(${idx}), 'stock')" class="text-red-400 text-xs">✕</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function editStock(idx) {
+            const item = state.inventory[idx];
+            const name = prompt("Update Name:", item.name);
+            const cost = prompt("Update Cost:", item.cost);
+            const sale = prompt("Update Sale:", item.sale);
+            const stock = prompt("Update Stock:", item.stock);
+            
+            if (name && cost && sale && stock) {
+                state.inventory[idx] = {
+                    name, 
+                    cost: parseFloat(cost), 
+                    sale: parseFloat(sale), 
+                    stock: parseFloat(stock)
+                };
+                save(); renderInventory();
+            }
+        }
+
+        function deleteStock(idx) {
+            if(confirm("Delete this product?")) {
+                state.inventory.splice(idx, 1);
+                save(); renderInventory();
+            }
+        }
+
+        function openProductModal() {
+            const name = prompt("Product Name?");
+            const cost = prompt("Kharid (Cost) Price?");
+            const sale = prompt("Sale Price?");
+            const stock = prompt("Quantity?");
+            if(name && cost && sale && stock) {
+                state.inventory.push({ 
+                    name, 
+                    cost: parseFloat(cost) || 0, 
+                    sale: parseFloat(sale) || 0, 
+                    stock: parseFloat(stock) || 0 
+                });
+                save(); renderInventory();
+            }
+        }
+
+        // --- BILLING ---
+        function autoFillPrice() {
+            const q = document.getElementById('billItemSearch').value.toLowerCase();
+            const hint = document.getElementById('searchHint');
+            if(!q) return hint.classList.add('hidden');
+            const matches = state.inventory.filter(i => i.name.toLowerCase().includes(q));
+            if(matches.length){
+                hint.classList.remove('hidden'); hint.innerHTML = '';
+                matches.forEach(m => {
+                    const d = document.createElement('div');
+                    d.className = "p-3 hover:bg-blue-50 cursor-pointer border-b text-xs flex justify-between items-center";
+                    d.innerHTML = `<div class="font-bold">${m.name}</div><div class="text-blue-600 font-mono">Rs ${m.sale}</div>`;
+                    d.onclick = () => {
+                        document.getElementById('billItemSearch').value = m.name;
+                        document.getElementById('billRate').value = m.sale;
+                        hint.classList.add('hidden');
+                        document.getElementById('billQty').focus();
+                    };
+                    hint.appendChild(d);
+                });
+            } else hint.classList.add('hidden');
+        }
+
+        function addToBill() {
+            const name = document.getElementById('billItemSearch').value;
+            const rate = parseFloat(document.getElementById('billRate').value) || 0;
+            const qty = parseFloat(document.getElementById('billQty').value) || 1;
+            if(!name || rate <= 0) return;
+            
+            const inv = state.inventory.find(i => i.name.toLowerCase() === name.toLowerCase());
+            const cost = inv ? inv.cost : rate;
+
+            state.bill.push({ name, rate, qty, cost, total: rate * qty, profit: (rate - cost) * qty });
+            renderBill();
+            
+            document.getElementById('billItemSearch').value = '';
+            document.getElementById('billRate').value = '';
+            document.getElementById('billQty').value = '1';
+            document.getElementById('billItemSearch').focus();
+        }
+
+        function renderBill() {
+            const body = document.getElementById('billBody'); body.innerHTML = '';
+            let total = 0;
+            state.bill.forEach((item, idx) => {
+                total += item.total;
+                body.innerHTML += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td class="text-center font-bold">${item.qty}</td>
+                        <td class="text-right">Rs ${item.rate.toLocaleString()}</td>
+                        <td class="text-right font-black">Rs ${item.total.toLocaleString()}</td>
+                        <td class="text-center"><button onclick="state.bill.splice(${idx},1);renderBill()" class="text-red-400">✕</button></td>
+                    </tr>
+                `;
+            });
+            document.getElementById('billTotalDisplay').innerText = `Rs ${total.toLocaleString()}`;
+            calculateBalance();
+        }
+
+        function calculateBalance() {
+            const total = parseFloat(document.getElementById('billTotalDisplay').innerText.replace(/Rs |,/g,'')) || 0;
+            const paid = parseFloat(document.getElementById('paidAmount').value) || 0;
+            const diff = total - paid;
+            const remBox = document.getElementById('remainingAmount');
+            remBox.innerText = diff.toLocaleString();
+            remBox.className = diff > 0 ? "p-2 border rounded bg-red-50 text-red-700 font-bold" : "p-2 border rounded bg-emerald-50 text-emerald-700 font-bold";
+        }
+
+        function finalizeBill() {
+            const total = parseFloat(document.getElementById('billTotalDisplay').innerText.replace(/Rs |,/g,'')) || 0;
+            const paid = parseFloat(document.getElementById('paidAmount').value) || 0;
+            let name = document.getElementById('billCustomerName').value.trim() || "Walk-in";
+            
+            if(!state.bill.length) return;
+
+            let totalProfit = 0;
+            state.bill.forEach(billItem => {
+                totalProfit += billItem.profit;
+                const stockItem = state.inventory.find(i => i.name.toLowerCase() === billItem.name.toLowerCase());
+                if (stockItem) stockItem.stock -= billItem.qty;
+            });
+
+            const sale = {
+                id: Date.now(),
+                date: new Date().toLocaleDateString(),
+                name, total, paid, profit: totalProfit,
+                items: [...state.bill]
+            };
+
+            state.sales.unshift(sale);
+
+            // AUTO-KHATA: Agar balance 0 se zyada hai aur customer name Walk-in nahi hai
+            if(total > paid && name !== "Walk-in") {
+                state.khata.unshift({
+                    id: Date.now() + 1,
+                    date: sale.date,
+                    name,
+                    note: "Baqi (Balance) From Bill #" + sale.id.toString().slice(-4),
+                    debit: total - paid,
+                    credit: 0,
+                    type: 'auto'
+                });
+            }
+
+            state.bill = [];
+            save(); 
+            printReceipt(sale);
+            renderBill();
+            updateCustomerDatalist();
+            document.getElementById('paidAmount').value = '';
+            document.getElementById('billCustomerName').value = '';
+        }
+
+        function printReceipt(data) {
+            const c = document.getElementById('printContainer');
+            c.innerHTML = `
+                <div style="font-family:'Courier New', monospace; width: 300px; margin: auto; padding: 20px; border: 1px solid #eee;">
+                    <div style="text-align:center; margin-bottom:15px">
+                        <h1 style="margin:0; font-size:22px; text-transform:uppercase;">${state.shop}</h1>
+                        <p style="margin:2px 0; font-size:10px;">Computerized Bill</p>
+                    </div>
+                    <div style="font-size:11px; border-top:1px solid #eee; padding-top:5px">
+                        <div>Date: ${data.date}</div>
+                        <div>Cust: ${data.name}</div>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; font-size:12px; margin:10px 0">
+                        <tr style="border-bottom:1px solid #000; font-weight:bold">
+                            <td>Item</td>
+                            <td style="text-align:center">Qty</td>
+                            <td style="text-align:right">Amt</td>
+                        </tr>
+                        ${data.items.map(i => `
+                            <tr>
+                                <td>${i.name}</td>
+                                <td style="text-align:center">${i.qty}</td>
+                                <td style="text-align:right">${i.total.toLocaleString()}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                    <div style="border-top:1px dashed #000; padding-top:10px; font-weight:bold; font-size:16px">
+                        <div style="display:flex; justify-content:space-between"><span>TOTAL</span><span>Rs ${data.total.toLocaleString()}</span></div>
+                        <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:5px"><span>PAID</span><span>Rs ${data.paid.toLocaleString()}</span></div>
+                        ${data.total - data.paid > 0 ? `<div style="display:flex; justify-content:space-between; font-size:12px; color:red"><span>BALANCE</span><span>Rs ${(data.total - data.paid).toLocaleString()}</span></div>` : ''}
+                    </div>
+                    <p style="text-align:center; font-size:10px; margin-top:20px">Shukria! Phir Tashreef Layen.</p>
+                </div>
+            `;
+            window.print();
+        }
+
+        // --- KHATA & REPORTS ---
+        function saveKhataEntry() {
+            const name = document.getElementById('khataCustomerName').value.trim();
+            const type = document.getElementById('khataType').value;
+            const amount = parseFloat(document.getElementById('khataAmount').value) || 0;
+            const note = document.getElementById('khataNote').value || "Entry";
+
+            if(!name || amount <= 0) return;
+
+            state.khata.unshift({
+                id: Date.now(),
+                date: new Date().toLocaleDateString(),
+                name, note,
+                debit: type === 'debit' ? amount : 0,
+                credit: type === 'credit' ? amount : 0,
+                type: 'manual'
+            });
+
+            save(); renderKhataList(); updateCustomerDatalist();
+            document.getElementById('khataAmount').value = '';
+            document.getElementById('khataNote').value = '';
+            document.getElementById('khataCustomerName').value = '';
+        }
+
+        function renderKhataList() {
+            const body = document.getElementById('khataTableBody');
+            const q = document.getElementById('khataSearch').value.toLowerCase();
+            body.innerHTML = '';
+            state.khata.filter(e => e.name.toLowerCase().includes(q)).forEach((e, idx) => {
+                body.innerHTML += `
+                    <tr>
+                        <td class="text-xs">${e.date}</td>
+                        <td class="font-bold">${e.name}</td>
+                        <td class="text-xs">${e.note}</td>
+                        <td class="text-right text-blue-600 font-bold">${e.debit ? 'Rs '+e.debit.toLocaleString() : ''}</td>
+                        <td class="text-right text-emerald-600 font-bold">${e.credit ? 'Rs '+e.credit.toLocaleString() : ''}</td>
+                        <td class="text-center">
+                            <button onclick="secureAction(() => { state.khata.splice(${idx},1); save(); renderKhataList(); }, 'stock')" class="text-slate-300 hover:text-red-500">✕</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderReports() {
+            const today = new Date().toLocaleDateString();
+            let saleT = 0, cashT = 0, udhaarT = 0, profitT = 0;
+
+            state.sales.forEach(s => {
+                if(s.date === today) {
+                    saleT += s.total;
+                    cashT += s.paid;
+                    profitT += s.profit;
+                }
+            });
+
+            state.khata.forEach(k => {
+                if(k.date === today) {
+                    if(k.debit > 0) udhaarT += k.debit;
+                    if(k.credit > 0 && k.type === 'manual') cashT += k.credit;
+                }
+            });
+
+            document.getElementById('repTodaySale').innerText = "Rs " + saleT.toLocaleString();
+            document.getElementById('repTodayCash').innerText = "Rs " + cashT.toLocaleString();
+            document.getElementById('repTodayUdhaar').innerText = "Rs " + udhaarT.toLocaleString();
+            document.getElementById('repTodayProfit').innerText = "Rs " + profitT.toLocaleString();
+
+            const body = document.getElementById('ledgerBody'); body.innerHTML = '';
+            const map = {};
+
+            state.sales.forEach(s => {
+                if(!map[s.name]) map[s.name] = { total:0, paid:0, profit:0 };
+                map[s.name].total += s.total;
+                map[s.name].paid += s.paid;
+                map[s.name].profit += s.profit;
+            });
+
+            state.khata.forEach(k => {
+                if(!map[k.name]) map[k.name] = { total:0, paid:0, profit:0 };
+                if(k.type === 'manual') map[k.name].paid += k.credit;
+            });
+
+            Object.keys(map).forEach(name => {
+                const bal = map[name].total - map[name].paid;
+                body.innerHTML += `
+                    <tr>
+                        <td class="font-bold">${name}</td>
+                        <td class="text-right">Rs ${map[name].total.toLocaleString()}</td>
+                        <td class="text-right">Rs ${map[name].paid.toLocaleString()}</td>
+                        <td class="text-right font-bold ${bal > 0 ? 'text-red-500' : ''}">Rs ${bal.toLocaleString()}</td>
+                        <td class="text-right text-emerald-600 font-bold">Rs ${map[name].profit.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function downloadCSV() {
+            let csv = "Customer Name,Total Bill,Cash Paid,Balance,Profit\n";
+            document.querySelectorAll("#ledgerBody tr").forEach(row => {
+                const data = Array.from(row.querySelectorAll("td")).map(c => c.innerText.replace(/Rs |,/g, ''));
+                csv += data.join(",") + "\n";
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `Report_${new Date().toLocaleDateString()}.csv`;
+            a.click();
+        }
+
+        function updateCustomerDatalist() {
+            const names = new Set();
+            state.sales.forEach(s => names.add(s.name));
+            state.khata.forEach(k => names.add(k.name));
+            const dl = document.getElementById('customerList');
+            dl.innerHTML = '';
+            names.forEach(name => {
+                if(name !== "Walk-in") {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    dl.appendChild(opt);
+                }
+            });
+        }
+
+        function saveSettings() {
+            state.shop = document.getElementById('setShopName').value || "MALIK ASHIQ STORE";
+            state.billPin = document.getElementById('setPin').value || "545";
+            state.stockPin = document.getElementById('setStockPin').value || "545";
+            state.print = document.getElementById('setPrintType').value;
+            save(); updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('headerBrand').innerText = state.shop;
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
